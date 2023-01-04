@@ -4,5 +4,8 @@ using an enhanced sampling protocol called ~Funnel Metadynamics~.
 The funnel metadynamics defines a funnel-shaped restraint that enhances
 the sampling of the ligand binding sites and its unbinding states.This method has been introduced in
 a paper titled ~Funnel metadynamics as accurate binding free-energy method~ and a new Funnel
-protocol explained in ~Combining Machine Learning and Enhanced Sampling Techniques for Efficient and
-Accurate Calculation of Absolute Binding Free Energies~.
+protocol explained in ~Combining Machine Learning and Enhanced Sampling Techniques for Efficient and Accurate Calculation of Absolute Binding Free Energies~.
+
+Here we run Funnel Metdaynamics MD simulations with the second protocol using two methods
+- OpenMM native Metadynamics (BioSimSpace)
+- OpenMM with ~Plumed~ plugin
