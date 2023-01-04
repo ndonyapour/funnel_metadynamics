@@ -1,0 +1,111 @@
+####################################
+#plumed.dat for Funnel Metadynamics#
+# Written on 2022-11-17 10:25:24.576560
+# By funnel_maker 1.0
+####################################
+#RESTART
+
+###############################################
+###DEFINE RADIUS + CALC PROT-LIG VECTOR COMP###
+###############################################
+
+WHOLEMOLECULES ...
+	ENTITY0=1-3220 #protein
+	ENTITY1=3221-3236 #ligand Benzamidine
+... WHOLEMOLECULES
+
+########################
+###DEFINITION_OF_COMs###
+########################
+#p1: COM ATOMS=1679,1689,1708,1727,1994,2013,2035,2479,2569,2575
+p1: COM ATOMS=5,328,348,358,530,550,567,1169,1738,1745,1769,1776,2467,2479,2490,2500,2517,2524,2536,2547,2554,2719,2735,2746,2770,2777,2788,2795,2898,2904,2911,2927
+p2: COM ATOMS=348,550,1769,1776,2479,2490,2500,2517,2524,2536,2547,2719,2735,2746,2770,2777,2788,2795,2904,2911
+
+########################
+###CALC_OF_d1###########
+########################
+lig_atoms: GROUP ATOMS=3221-3236
+lig: COM ATOMS=lig_atoms
+bsite: COM ATOMS=328,348,1769,2479,2490,2500,2517,2524,2536,2547,2719,2735,2746,2770,2777,2788,2795,2904,2911
+# two closest atoms of ligand and binding site
+d1: DISTANCE ATOMS=bsite,lig
+
+########################
+###DEFINITION_OF_ARGs###
+########################
+# CV1: pp.proj = projection on the axis. The distance from the axis to the origin (along the axis)
+# CV2: pp.ext = orthogonal distance between the ATOM(=lig) to the axis.
+
+############
+###PoA_CV ##
+############
+pp: PROJECTION_ON_AXIS AXIS_ATOMS=p1,p2 ATOM=lig
+
+############
+###PoA_CV ##
+############
+rmsd: RMSD REFERENCE=./inputs/ref_secondary_ca.pdb TYPE=OPTIMAL
+
+#######################
+###FUNNEL_PARAMETERS###
+#######################
+s_cent: CONSTANT VALUES=2.3                                    # INFLEXION
+beta_cent: CONSTANT VALUES=1.0                                 # STEEPNESS
+wall_width: CONSTANT VALUES=0.85                               # WIDTH (h)
+wall_buffer: CONSTANT VALUES=0.15                               # BUFFER (f, total width = WIDTH + BUFFER)
+lwall: LOWER_WALLS ARG=pp.proj AT=0.5 KAPPA=20000.0 EXP=2 EPS=1 # Lower Wall (the starting point of the funnel)
+uwall: UPPER_WALLS ARG=pp.proj AT=3.6 KAPPA=20000.0 EXP=2 EPS=1 # Upper Wall (the ending point of the funnel)
+uwall-rmsd: UPPER_WALLS ARG=rmsd AT=0.08 KAPPA=50000 EXP=2 OFFSET=0 EPS=1
+
+#restraint: RESTRAINT ARG=rmsd AT=0.08 KAPPA=1500
+
+
+
+##################################
+###########CALCULATE FUNNEL#######
+# Returns the radius of the funnel
+# at the current value of the cv
+##################################
+MATHEVAL ...
+        LABEL=wall_center
+        ARG=pp.proj,s_cent,beta_cent,wall_width,wall_buffer
+        VAR=s,sc,b,h,f
+        FUNC=h*(1./(1.+exp(b*(s-sc))))+f
+        PERIODIC=NO
+... MATHEVAL
+
+
+##############################
+#####POTENTIAL_PARAMETERS#####
+##############################
+scaling: CONSTANT VALUES=1.0
+spring: CONSTANT VALUES=1000.0
+
+##############################
+#######DEFINE_POTENTIAL#######
+##############################
+MATHEVAL ...
+        LABEL=wall_bias
+        ARG=pp.ext,spring,wall_center,scaling
+        VAR=z,k,zc,sf
+        FUNC=step(z-zc)*k*(z-zc)*(z-zc)/(sf*sf)
+        PERIODIC=NO
+... MATHEVAL
+
+finalbias: BIASVALUE ARG=wall_bias
+
+
+###############################
+########DEFINE_METAD###########
+###############################
+METAD ...
+        LABEL=meta ARG=pp.proj,pp.ext
+        SIGMA=0.05,0.02 HEIGHT=2
+        PACE=1000 FILE=HILLS
+        GRID_MIN=0.0,0.0 GRID_MAX=5.0,1.4 #GRID_SPACING=0.005,0.005
+        BIASFACTOR=15.0 TEMP=300
+        CALC_RCT
+... METAD
+
+
+PRINT ARG=* STRIDE=500 FILE=COLVAR FMT=%8.4f
